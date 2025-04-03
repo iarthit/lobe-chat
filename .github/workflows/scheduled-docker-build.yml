@@ -63,18 +63,6 @@ jobs:
             echo "updated=false" >> $GITHUB_OUTPUT
           fi
 
-      # 4. 复制文件（仅在有更新时）
-      - name: Copy files from target repository
-        run: |
-          cp -r target-repo/. .
-          rm -rf target-repo
-
-      # 5. 修改 Dockerfile（仅在有更新时）
-      - name: Modify Dockerfile.database
-        run: |
-          sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' Dockerfile.database
-          cat Dockerfile.database
-
       # 8. 上传最新的提交哈希（仅在有更新时）
       - name: Upload last commit hash
         uses: actions/upload-artifact@v4
