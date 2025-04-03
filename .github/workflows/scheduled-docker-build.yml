@@ -55,18 +55,12 @@ jobs:
         if: steps.check_updates.outputs.updated == 'true'
         run: |
           cp -r target-repo/. .
-          ls -la
-          if [ ! -f ".npmrc" ]; then
-            echo "Error: .npmrc not found after copy"
-            exit 1
-          fi
           rm -rf target-repo
 
       # 5. 修改 Dockerfile（仅在有更新时）
       - name: Modify Dockerfile.database
         if: steps.check_updates.outputs.updated == 'true'
         run: |
-          # 在 ENV NODE_OPTIONS="--max-old-space-size=8192" 后插入三行变量
           sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' Dockerfile.database
 
       # 6. 登录 Docker Hub（仅在有更新时）
