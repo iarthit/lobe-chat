@@ -16,7 +16,7 @@ jobs:
 
       # 2. 下载上次的提交哈希（如果存在）
       - name: Download last commit hash
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: last_commit # artifact 名称，与上传时一致
         continue-on-error: true # 如果没有 artifact（例如第一次运行），不报错
