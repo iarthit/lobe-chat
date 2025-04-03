@@ -34,6 +34,35 @@ jobs:
             echo "Download failed or no artifact available."
           fi
 
+      # 3. 检查目标仓库是否有更新
+      - name: Check for updates in target repository
+        id: check_updates
+        run: |
+          # 克隆目标仓库并指定分支
+          git clone --branch main https://github.com/lobehub/lobe-chat.git target-repo
+          cd target-repo
+          LATEST_COMMIT=$(git rev-parse HEAD)  # 获取目标分支最新提交哈希
+          cd ..
+
+          # 检查是否存在上次的提交哈希文件
+          if [ -f "last_commit.txt" ]; then
+            LAST_KNOWN_COMMIT=$(cat last_commit.txt)
+            echo "Last known commit: $LAST_KNOWN_COMMIT"
+          else
+            LAST_KNOWN_COMMIT=""
+            echo "No previous commit hash found (first run or no artifact)."
+          fi
+
+          # 比较哈希，判断是否有更新
+          if [ "$LATEST_COMMIT" != "$LAST_KNOWN_COMMIT" ]; then
+            echo "Changes detected: $LATEST_COMMIT"
+            echo "$LATEST_COMMIT" > last_commit.txt  # 更新哈希文件
+            echo "updated=true" >> $GITHUB_OUTPUT
+          else
+            echo "No changes detected, skipping build."
+            echo "updated=false" >> $GITHUB_OUTPUT
+          fi
+
       # 4. 复制文件（仅在有更新时）
       - name: Copy files from target repository
         run: |
