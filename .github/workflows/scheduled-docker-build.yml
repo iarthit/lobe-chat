@@ -31,7 +31,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: last_commit
-          path: ./artifacts/  # 指定一个明确路径，避免覆盖其他文件
+          path: ./ # 指定一个明确路径，避免覆盖其他文件
           run-id: ${{ steps.get_run_id.outputs.run_id }}  # 指定上一次运行的 ID
         continue-on-error: true
 
