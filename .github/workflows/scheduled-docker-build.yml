@@ -1,0 +1,89 @@
+name: Build and Push Docker Image
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 每天 UTC 时间 0:00 执行
+  workflow_dispatch:
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 检出当前仓库代码
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. 下载上次的提交哈希（如果存在）
+      - name: Download last commit hash
+        uses: actions/download-artifact@v3
+        with:
+          name: last_commit # artifact 名称，与上传时一致
+        continue-on-error: true # 如果没有 artifact（例如第一次运行），不报错
+
+      # 3. 检查目标仓库是否有更新
+      - name: Check for updates in target repository
+        id: check_updates
+        run: |
+          # 克隆目标仓库并指定分支
+          git clone --branch main https://github.com/lobehub/lobe-chat.git target-repo
+          cd target-repo
+          LATEST_COMMIT=$(git rev-parse HEAD)  # 获取目标分支最新提交哈希
+          cd ..
+
+          # 检查是否存在上次的提交哈希文件
+          if [ -f "last_commit.txt" ]; then
+            LAST_KNOWN_COMMIT=$(cat last_commit.txt)
+            echo "Last known commit: $LAST_KNOWN_COMMIT"
+          else
+            LAST_KNOWN_COMMIT=""
+            echo "No previous commit hash found (first run or no artifact)."
+          fi
+
+          # 比较哈希，判断是否有更新
+          if [ "$LATEST_COMMIT" != "$LAST_KNOWN_COMMIT" ]; then
+            echo "Changes detected: $LATEST_COMMIT"
+            echo "$LATEST_COMMIT" > last_commit.txt  # 更新哈希文件
+            echo "updated=true" >> $GITHUB_OUTPUT
+          else
+            echo "No changes detected, skipping build."
+            echo "updated=false" >> $GITHUB_OUTPUT
+          fi
+
+      # 4. 复制文件（仅在有更新时）
+      - name: Copy files from target repository
+        if: steps.check_updates.outputs.updated == 'true'
+        run: |
+          cp -r target-repo/* .
+          rm -rf target-repo
+
+      # 5. 修改 Dockerfile（仅在有更新时）
+      - name: Modify Dockerfile.database
+        if: steps.check_updates.outputs.updated == 'true'
+        run: |
+          sed -i '78i ENV NEW_VAR1=value1' Dockerfile.database
+          sed -i '79i ENV NEW_VAR2=value2' Dockerfile.database
+          sed -i '80i ENV NEW_VAR3=value3' Dockerfile.database
+
+      # 6. 登录 Docker Hub（仅在有更新时）
+      - name: Login to Docker Hub
+        if: steps.check_updates.outputs.updated == 'true'
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 7. 构建并推送 Docker 镜像（仅在有更新时）
+      - name: Build and push Docker image
+        if: steps.check_updates.outputs.updated == 'true'
+        run: |
+          docker build -f Dockerfile.database -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest .
+          docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest
+
+      # 8. 上传最新的提交哈希（仅在有更新时）
+      - name: Upload last commit hash
+        if: steps.check_updates.outputs.updated == 'true'
+        uses: actions/upload-artifact@v3
+        with:
+          name: last_commit # artifact 名称
+          path: last_commit.txt # 上传的文件
