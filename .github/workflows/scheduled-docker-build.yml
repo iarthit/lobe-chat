@@ -34,35 +34,6 @@ jobs:
             echo "Download failed or no artifact available."
           fi
 
-      # 3. 检查目标仓库是否有更新
-      - name: Check for updates in target repository
-        id: check_updates
-        run: |
-          # 克隆目标仓库并指定分支
-          git clone --branch main https://github.com/lobehub/lobe-chat.git target-repo
-          cd target-repo
-          LATEST_COMMIT=$(git rev-parse HEAD)  # 获取目标分支最新提交哈希
-          cd ..
-
-          # 检查是否存在上次的提交哈希文件
-          if [ -f "last_commit.txt" ]; then
-            LAST_KNOWN_COMMIT=$(cat last_commit.txt)
-            echo "Last known commit: $LAST_KNOWN_COMMIT"
-          else
-            LAST_KNOWN_COMMIT=""
-            echo "No previous commit hash found (first run or no artifact)."
-          fi
-
-          # 比较哈希，判断是否有更新
-          if [ "$LATEST_COMMIT" != "$LAST_KNOWN_COMMIT" ]; then
-            echo "Changes detected: $LATEST_COMMIT"
-            echo "$LATEST_COMMIT" > last_commit.txt  # 更新哈希文件
-            echo "updated=true" >> $GITHUB_OUTPUT
-          else
-            echo "No changes detected, skipping build."
-            echo "updated=false" >> $GITHUB_OUTPUT
-          fi
-
       # 4. 复制文件（仅在有更新时）
       - name: Copy files from target repository
         if: steps.check_updates.outputs.updated == 'true'
@@ -75,31 +46,6 @@ jobs:
         if: steps.check_updates.outputs.updated == 'true'
         run: |
           sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' Dockerfile.database
-
-      # 6. 登录 Docker Hub（仅在有更新时）
-      - name: Login to Docker Hub
-        if: steps.check_updates.outputs.updated == 'true'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      # 7. 构建并推送 Docker 镜像（仅在有更新时）
-      - name: Build and push Docker image
-        if: steps.check_updates.outputs.updated == 'true'
-        run: |
-          # 构建镜像
-          docker build -f Dockerfile.database -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest .
-
-          # 获取当前日期，格式为 YYYYMMDD（例如 20250403）
-          CURRENT_DATE=$(TZ='Asia/Shanghai' date +%Y%m%d)
-
-          # 打动态日期的 tag
-          docker tag ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$CURRENT_DATE
-
-          # 推送 latest 和日期 tag
-          docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest
-          docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$CURRENT_DATE
 
       # 8. 上传最新的提交哈希（仅在有更新时）
       - name: Upload last commit hash
