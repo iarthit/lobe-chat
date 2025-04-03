@@ -61,9 +61,9 @@ jobs:
       - name: Modify Dockerfile.database
         if: steps.check_updates.outputs.updated == 'true'
         run: |
-          sed -i '78i ENV NEW_VAR1=value1' Dockerfile.database
-          sed -i '79i ENV NEW_VAR2=value2' Dockerfile.database
-          sed -i '80i ENV NEW_VAR3=value3' Dockerfile.database
+          sed -i '78i ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0' Dockerfile.database
+          sed -i '79i ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=value2' Dockerfile.database
+          sed -i '80i ENV CLERK_WEBHOOK_SECRET=value3' Dockerfile.database
 
       # 6. 登录 Docker Hub（仅在有更新时）
       - name: Login to Docker Hub
