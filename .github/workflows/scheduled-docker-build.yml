@@ -46,6 +46,7 @@ jobs:
         if: steps.check_updates.outputs.updated == 'true'
         run: |
           sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' Dockerfile.database
+          cat Dockerfile.database
 
       # 8. 上传最新的提交哈希（仅在有更新时）
       - name: Upload last commit hash
