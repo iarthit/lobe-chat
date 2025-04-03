@@ -92,7 +92,7 @@ jobs:
       # 8. 上传最新的提交哈希（仅在有更新时）
       - name: Upload last commit hash
         if: steps.check_updates.outputs.updated == 'true'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: last_commit # artifact 名称
           path: last_commit.txt # 上传的文件
