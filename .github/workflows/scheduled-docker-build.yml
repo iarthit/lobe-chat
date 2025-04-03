@@ -2,7 +2,7 @@ name: Build and Push Docker Image
 
 on:
   schedule:
-    - cron: "0 2 * * *" # 每天 UTC 时间 0:00 执行
+    - cron: "0 18 * * *" # UTC 18:00 = 上海时间 02:00
   workflow_dispatch:
 
 jobs:
@@ -61,9 +61,8 @@ jobs:
       - name: Modify Dockerfile.database
         if: steps.check_updates.outputs.updated == 'true'
         run: |
-          sed -i '78i ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0' Dockerfile.database
-          sed -i '79i ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=value2' Dockerfile.database
-          sed -i '80i ENV CLERK_WEBHOOK_SECRET=value3' Dockerfile.database
+          # 在 ENV NODE_OPTIONS="--max-old-space-size=8192" 后插入三行变量
+          sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV ENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' Dockerfile.database
 
       # 6. 登录 Docker Hub（仅在有更新时）
       - name: Login to Docker Hub
@@ -77,8 +76,18 @@ jobs:
       - name: Build and push Docker image
         if: steps.check_updates.outputs.updated == 'true'
         run: |
+          # 构建镜像
           docker build -f Dockerfile.database -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest .
+
+          # 获取当前日期，格式为 YYYYMMDD（例如 20250403）
+          CURRENT_DATE=$(TZ='Asia/Shanghai' date +%Y%m%d)
+
+          # 打动态日期的 tag
+          docker tag ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$CURRENT_DATE
+
+          # 推送 latest 和日期 tag
           docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$CURRENT_DATE
 
       # 8. 上传最新的提交哈希（仅在有更新时）
       - name: Upload last commit hash
