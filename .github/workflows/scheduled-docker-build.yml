@@ -54,7 +54,7 @@ jobs:
       - name: Copy files from target repository
         if: steps.check_updates.outputs.updated == 'true'
         run: |
-          cp -r target-repo/* .
+          cp -r target-repo/. .
           ls -la
           if [ ! -f ".npmrc" ]; then
             echo "Error: .npmrc not found after copy"
