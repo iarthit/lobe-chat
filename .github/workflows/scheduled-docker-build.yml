@@ -14,14 +14,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # 2. 下载上次的提交哈希（如果存在）
+# 2. 获取上一次成功的 workflow run ID
+      - name: Get previous run ID
+        id: get_run_id
+        run: |
+          # 使用 GitHub CLI 获取上一次成功的运行 ID
+          PREVIOUS_RUN_ID=$(gh run list --workflow="Build and Push Docker Image" --status=success --json databaseId --jq '.[1].databaseId' || echo "")
+          echo "Previous run ID: $PREVIOUS_RUN_ID"
+          echo "run_id=$PREVIOUS_RUN_ID" >> $GITHUB_OUTPUT
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      # 3. 下载上次的提交哈希（如果存在）
       - name: Download last commit hash
         id: download_artifact
         uses: actions/download-artifact@v4
         with:
           name: last_commit
-          path: ./
-        continue-on-error: true  # 允许失败，不影响后续步骤
+          path: ./artifacts/  # 指定一个明确路径，避免覆盖其他文件
+          run-id: ${{ steps.get_run_id.outputs.run_id }}  # 指定上一次运行的 ID
+        continue-on-error: true
 
       - name: Check downloaded artifact
         run: |
