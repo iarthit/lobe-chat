@@ -19,6 +19,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: last_commit # artifact 名称，与上传时一致
+          path: ./
         continue-on-error: true # 如果没有 artifact（例如第一次运行），不报错
 
       # 3. 检查目标仓库是否有更新
