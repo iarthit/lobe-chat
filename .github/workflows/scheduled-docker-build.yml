@@ -14,70 +14,85 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
-# 2. 获取上一次成功的 workflow run ID
-      - name: Get previous run ID
-        id: get_run_id
-        run: |
-          # 使用 GitHub CLI 获取上一次成功的运行 ID
-          PREVIOUS_RUN_ID=$(gh run list --workflow="Build and Push Docker Image" --status=success --json databaseId --jq '.[1].databaseId' || echo "")
-          echo "Previous run ID: $PREVIOUS_RUN_ID"
-          echo "run_id=$PREVIOUS_RUN_ID" >> $GITHUB_OUTPUT
-        env:
-          GH_TOKEN: ${{ github.token }}
-
-      # 3. 下载上次的提交哈希（如果存在）
-      - name: Download last commit hash
-        id: download_artifact
-        uses: actions/download-artifact@v4
+      # 2. 恢复缓存中的上次提交哈希
+      - name: Restore last commit hash from cache
+        id: cache-restore
+        uses: actions/cache@v4
         with:
-          name: last_commit
-          path: ./ # 指定一个明确路径，避免覆盖其他文件
-          run-id: ${{ steps.get_run_id.outputs.run_id }}  # 指定上一次运行的 ID
-        continue-on-error: true
-
-      - name: Check downloaded artifact
-        run: |
-          echo "Attempting to download last_commit artifact..."
-          ls -la  # 调试：列出当前目录文件
-          if [ -f "last_commit.txt" ]; then
-            echo "Download successful, last_commit.txt found:"
-            cat last_commit.txt
-          else
-            echo "Download failed or no artifact available."
-          fi
+          path: last_commit.txt
+          key: last-commit-${{ github.sha }}
+          restore-keys: |
+            last-commit-
 
       # 3. 检查目标仓库是否有更新
       - name: Check for updates in target repository
         id: check_updates
         run: |
-          # 克隆目标仓库并指定分支
-          git clone --branch main https://github.com/lobehub/lobe-chat.git target-repo
+          git clone --depth=1 --branch main https://github.com/lobehub/lobe-chat.git target-repo
           cd target-repo
-          LATEST_COMMIT=$(git rev-parse HEAD)  # 获取目标分支最新提交哈希
+          LATEST_COMMIT=$(git rev-parse HEAD)
           cd ..
 
-          # 检查是否存在上次的提交哈希文件
           if [ -f "last_commit.txt" ]; then
             LAST_KNOWN_COMMIT=$(cat last_commit.txt)
             echo "Last known commit: $LAST_KNOWN_COMMIT"
           else
             LAST_KNOWN_COMMIT=""
-            echo "No previous commit hash found (first run or no artifact)."
+            echo "No previous commit hash found (first run or cache miss)."
           fi
 
-          # 比较哈希，判断是否有更新
           if [ "$LATEST_COMMIT" != "$LAST_KNOWN_COMMIT" ]; then
             echo "Changes detected: $LATEST_COMMIT"
-            echo "$LATEST_COMMIT" > last_commit.txt  # 更新哈希文件
-            echo "updated=true" >> $GITHUB_OUTPUT
+            echo "$LATEST_COMMIT" > last_commit.txt
+            echo "updated=true" >> "$GITHUB_ENV"
           else
             echo "No changes detected, skipping build."
-            echo "updated=false" >> $GITHUB_OUTPUT
+            echo "updated=false" >> "$GITHUB_ENV"
           fi
 
-      # 8. 上传最新的提交哈希（仅在有更新时）
-      - name: Upload last commit hash
-        uses: actions/upload-artifact@v4
+      # 4. 复制文件（仅在有更新时）
+      - name: Copy files from target repository
+        if: env.updated == 'true'
+        run: |
+          cp -r target-repo/. .
+          rm -rf target-repo
+
+      # 5. 修改 Dockerfile（仅在有更新时）
+      - name: Modify Dockerfile.database
+        if: env.updated == 'true'
+        run: |
+          sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' Dockerfile.database
+
+      # 6. 登录 Docker Hub
+      - name: Login to Docker Hub
+        if: env.updated == 'true'
+        uses: docker/login-action@v3
         with:
-          name: last_commit # artifact 名称
-          path: last_commit.txt # 上传的文件
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 7. 构建并推送 Docker 镜像
+      - name: Build and push Docker image
+        if: env.updated == 'true'
+        run: |
+          docker build -f Dockerfile.database --cache-from ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest .
+
+          CURRENT_DATE=$(TZ='Asia/Shanghai' date +%Y%m%d)
+
+          docker tag ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$CURRENT_DATE
+
+          docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest
+          docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$CURRENT_DATE
+
+      # 8. 缓存最新的提交哈希
+      - name: Cache last commit hash
+        if: env.updated == 'true'
+        uses: actions/cache@v4
+        with:
+          path: last_commit.txt
+          key: last-commit-${{ github.sha }}
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf target-repo
