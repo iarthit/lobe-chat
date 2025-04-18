@@ -2,7 +2,7 @@ name: Build and Push Docker Image with Tag
 
 on:
   schedule:
-    - cron: "0 18 * * *" # UTC 18:00 = 上海时间 02:00
+    - cron: "0 18 * * 1" # UTC 18:00 = 上海时间 02:00
   workflow_dispatch:
 
 jobs:
