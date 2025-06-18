@@ -86,6 +86,20 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$TAG_NAME
 
+      - name: Update README with build log
+        if: env.updated == 'true'
+        run: |
+          # 设置 Git 配置
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+          # 添加日志到 README.md
+          echo -e "\n### Build Log\n- $(date '+%Y-%m-%d %H:%M:%S') Built and pushed Docker image: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:${{ env.TAG_NAME }}" >> README.md
+
+          # 提交更改
+          git add README.md
+          git commit -m "Update README with build log for ${{ env.TAG_NAME }}"
+          git push
       # 8. 缓存最新的 Tag 版本
       - name: Cache last tag version
         if: env.updated == 'true'
