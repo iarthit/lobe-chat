@@ -90,6 +90,7 @@ jobs:
         if: env.updated == 'true'
         run: |
           # 设置 Git 配置
+          git checkout main
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
@@ -99,7 +100,7 @@ jobs:
           # 提交更改
           git add README.md
           git commit -m "Update README with build log for ${{ env.TAG_NAME }}"
-          git push
+          git push origin main
       # 8. 缓存最新的 Tag 版本
       - name: Cache last tag version
         if: env.updated == 'true'
