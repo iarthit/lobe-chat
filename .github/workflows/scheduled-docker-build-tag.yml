@@ -13,6 +13,8 @@ jobs:
       # 1. 检出当前仓库代码
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          ref: main
 
       # 2. 恢复缓存中的上次 Tag 版本
       - name: Restore last tag version from cache
@@ -89,18 +91,22 @@ jobs:
       - name: Update README with build log
         if: env.updated == 'true'
         run: |
+          # 重置工作目录，忽略除 README.md 外的所有更改
+          git checkout -- .
+          git clean -fd
+
           # 设置 Git 配置
-          git checkout main
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
           # 添加日志到 README.md
-          echo -e "\n### Build Log\n- $(date '+%Y-%m-%d %H:%M:%S') Built and pushed Docker image: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:${{ env.TAG_NAME }}" >> README.md
-
-          # 提交更改
+          echo -e "\n### Build Log\n- $(TZ=Asia/Shanghai date '+%Y-%m-%d %H:%M:%S') Built and pushed Docker image: ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:${{ env.TAG_NAME }}" >> README.md
+          
+          # 提交 README.md 更改
           git add README.md
-          git commit -m "Update README with build log for ${{ env.TAG_NAME }}"
+          git commit -m "Update README with build log for ${{ env.TAG_NAME }}" || echo "No changes to commit"
           git push origin main
+          
       # 8. 缓存最新的 Tag 版本
       - name: Cache last tag version
         if: env.updated == 'true'
