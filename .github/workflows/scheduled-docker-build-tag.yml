@@ -72,7 +72,8 @@ jobs:
       - name: Update CHANGELOG.md
         if: env.updated == 'true'
         run: |
-          CHANGELOG_CONTENT="## Version ${{ env.TAG_NAME }} - $(date +'%Y-%m-%d')\n\n- Automatically built and pushed Docker image based on new tag.\n\n$(cat CHANGELOG.md 2>/dev/null)"
+          NEW_CHANGELOG_BLOCK="## Version ${{ env.TAG_NAME }} - $(date +'%Y-%m-%d')\n\n"
+          CHANGELOG_CONTENT="${NEW_CHANGELOG_BLOCK}$(cat CHANGELOG.md 2>/dev/null)"
           echo "$CHANGELOG_CONTENT" > CHANGELOG.md
 
       # 7. 提交并推送 CHANGELOG (新增加的步骤)
