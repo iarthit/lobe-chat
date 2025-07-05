@@ -2,7 +2,7 @@ name: Build and Push Docker Image with Tag
 
 on:
   schedule:
-    - cron: "0 18 * * 1" # UTC 18:00 = 上海时间 02:00
+    - cron: "0 18 * * 1" # UTC 18:00 = 北京时间 02:00
   workflow_dispatch:
 
 jobs:
@@ -11,8 +11,9 @@ jobs:
 
     steps:
       # 1. 检出当前仓库代码
+      # 这一步是为了能够读取和写入 CHANGELOG.md 文件，并提交回本仓库
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           ref: main
 
@@ -22,7 +23,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: last_tag.txt
-          key: last-tag-${{ github.sha }}
+          key: last-tag-${{ github.run_id }} # 使用 run_id 确保每次运行都能尝试保存
           restore-keys: |
             last-tag-
 
@@ -32,13 +33,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }} # 使用自定义的 Secret
         run: |
-          # 使用 GitHub API 获取最新的 Tag，并添加认证
+          # 使用 GitHub API 获取最新的 Tag
           LATEST_TAG=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/lobehub/lobe-chat/tags | jq -r '.[0].name')
-          echo "Latest tag: $LATEST_TAG"
+          echo "Latest tag from remote: $LATEST_TAG"
 
           if [ -f "last_tag.txt" ]; then
             LAST_KNOWN_TAG=$(cat last_tag.txt)
-            echo "Last known tag: $LAST_KNOWN_TAG"
+            echo "Last known tag from cache: $LAST_KNOWN_TAG"
           else
             LAST_KNOWN_TAG=""
             echo "No previous tag version found (first run or cache miss)."
@@ -58,7 +59,9 @@ jobs:
       - name: Checkout target repository at tag
         if: env.updated == 'true'
         run: |
+          # 为了不与当前仓库的 .git 目录冲突，克隆到新目录中
           git clone --depth=1 --branch ${{ env.TAG_NAME }} https://github.com/lobehub/lobe-chat.git target-repo
+          # 将目标代码复制到工作区根目录，覆盖原有文件（除了 .git）
           cp -r target-repo/. .
           rm -rf target-repo
 
@@ -68,7 +71,30 @@ jobs:
         run: |
           sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' Dockerfile.database
 
-      # 6. 登录 Docker Hub
+      # 6. 更新 CHANGELOG.md (新增加的步骤)
+      - name: Update CHANGELOG.md
+        if: env.updated == 'true'
+        run: |
+          # 在 CHANGELOG.md 文件顶部追加新内容
+          CHANGELOG_CONTENT="## Version ${{ env.TAG_NAME }} - $(date +'%Y-%m-%d')\n\n- Automatically built and pushed Docker image based on new tag.\n\n$(cat CHANGELOG.md 2>/dev/null)"
+          echo "$CHANGELOG_CONTENT" > CHANGELOG.md
+
+      # 7. 提交并推送 CHANGELOG (新增加的步骤)
+      - name: Commit and Push CHANGELOG
+        if: env.updated == 'true'
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add CHANGELOG.md
+          # 检查是否有文件变动，避免在没有变动时执行提交
+          if ! git diff --staged --quiet; then
+            git commit -m "docs: Update CHANGELOG for version ${{ env.TAG_NAME }}"
+            git push
+          else
+            echo "CHANGELOG.md was not modified."
+          fi
+
+      # 8. 登录 Docker Hub
       - name: Login to Docker Hub
         if: env.updated == 'true'
         uses: docker/login-action@v3
@@ -76,7 +102,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 7. 构建并推送 Docker 镜像
+      # 9. 构建并推送 Docker 镜像
       - name: Build and push Docker image
         if: env.updated == 'true'
         run: |
@@ -88,16 +114,17 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$TAG_NAME
 
-      # 8. 缓存最新的 Tag 版本
+      # 10. 缓存最新的 Tag 版本
       - name: Cache last tag version
         if: env.updated == 'true'
         uses: actions/cache@v4
         with:
           path: last_tag.txt
-          key: last-tag-${{ github.sha }}
+          key: last-tag-${{ github.run_id }} # 确保这次运行的 tag 被保存
 
-      # 9. 清理
+      # 11. 清理
       - name: Clean up
         if: always()
         run: |
+          # 清理可能存在的残留文件
           rm -rf target-repo
