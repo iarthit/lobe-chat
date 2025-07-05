@@ -12,7 +12,7 @@ jobs:
     steps:
       # 1. 检出当前仓库代码
       # 这一步是为了能够读取和写入 CHANGELOG.md 文件，并提交回本仓库
-      - name: Checkout repository
+      - name: Checkout current repository
         uses: actions/checkout@v4
         with:
           ref: main
@@ -55,27 +55,23 @@ jobs:
             echo "updated=false" >> "$GITHUB_ENV"
           fi
 
-      # 4. 检出指定 Tag 的代码（仅在有新 Tag 时）
-      - name: Checkout target repository at tag
+      # 4. 克隆指定 Tag 的目标仓库代码（仅在有新 Tag 时）
+      # 将 lobehub/lobe-chat 克隆到一个单独的目录，避免污染当前仓库的工作区
+      - name: Clone target repository at tag
         if: env.updated == 'true'
         run: |
-          # 为了不与当前仓库的 .git 目录冲突，克隆到新目录中
-          git clone --depth=1 --branch ${{ env.TAG_NAME }} https://github.com/lobehub/lobe-chat.git target-repo
-          # 将目标代码复制到工作区根目录，覆盖原有文件（除了 .git）
-          cp -r target-repo/. .
-          rm -rf target-repo
+          git clone --depth=1 --branch ${{ env.TAG_NAME }} https://github.com/lobehub/lobe-chat.git cloned-lobe-chat
 
       # 5. 修改 Dockerfile（仅在有新 Tag 时）
-      - name: Modify Dockerfile.database
+      - name: Modify Dockerfile.database in cloned repository
         if: env.updated == 'true'
         run: |
-          sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' Dockerfile.database
+          sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' cloned-lobe-chat/Dockerfile.database
 
       # 6. 更新 CHANGELOG.md (新增加的步骤)
       - name: Update CHANGELOG.md
         if: env.updated == 'true'
         run: |
-          # 在 CHANGELOG.md 文件顶部追加新内容
           CHANGELOG_CONTENT="## Version ${{ env.TAG_NAME }} - $(date +'%Y-%m-%d')\n\n- Automatically built and pushed Docker image based on new tag.\n\n$(cat CHANGELOG.md 2>/dev/null)"
           echo "$CHANGELOG_CONTENT" > CHANGELOG.md
 
@@ -103,10 +99,11 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       # 9. 构建并推送 Docker 镜像
+      # 使用克隆的 lobe-chat 仓库作为构建上下文
       - name: Build and push Docker image
         if: env.updated == 'true'
         run: |
-          docker build -f Dockerfile.database --cache-from ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest .
+          docker build -f cloned-lobe-chat/Dockerfile.database --cache-from ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest cloned-lobe-chat
 
           TAG_NAME=${{ env.TAG_NAME }}
           docker tag ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$TAG_NAME
@@ -127,4 +124,4 @@ jobs:
         if: always()
         run: |
           # 清理可能存在的残留文件
-          rm -rf target-repo
+          rm -rf cloned-lobe-chat
