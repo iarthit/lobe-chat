@@ -1,1 +1,1 @@
-## Version v1.102.1 - 2025-07-21\n\n## Version v1.99.0 - 2025-07-14\n\n## Version v1.98.2 - 2025-07-14\n\n## Version v1.96.19 - 2025-07-07\n\n## Version v1.96.17 - 2025-07-05\n\n- Automatically built and pushed Docker image based on new tag.\n\n
+## Version v1.105.0 - 2025-07-28\n\n## Version v1.102.1 - 2025-07-21\n\n## Version v1.99.0 - 2025-07-14\n\n## Version v1.98.2 - 2025-07-14\n\n## Version v1.96.19 - 2025-07-07\n\n## Version v1.96.17 - 2025-07-05\n\n- Automatically built and pushed Docker image based on new tag.\n\n
