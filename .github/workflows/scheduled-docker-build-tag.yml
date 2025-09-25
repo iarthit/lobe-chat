@@ -72,7 +72,7 @@ jobs:
       - name: Update CHANGELOG.md
         if: env.updated == 'true'
         run: |
-          NEW_CHANGELOG_BLOCK="## Version ${{ env.TAG_NAME }} - $(date +'%Y-%m-%d')\n\n"
+          NEW_CHANGELOG_BLOCK="$(printf '## Version %s - %s\n\n' "${{ env.TAG_NAME }}" "$(date +'%Y-%m-%d')")"
           CHANGELOG_CONTENT="${NEW_CHANGELOG_BLOCK}$(cat CHANGELOG.md 2>/dev/null)"
           echo "$CHANGELOG_CONTENT" > CHANGELOG.md
 
@@ -85,7 +85,7 @@ jobs:
           git add CHANGELOG.md
           # 检查是否有文件变动，避免在没有变动时执行提交
           if ! git diff --staged --quiet; then
-            git commit -m "docs: Update CHANGELOG for version ${{ env.TAG_NAME }}"
+            git commit -m "docs: Update version ${{ env.TAG_NAME }}"
             git push
           else
             echo "CHANGELOG.md was not modified."
