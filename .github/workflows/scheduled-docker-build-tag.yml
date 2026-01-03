@@ -63,7 +63,7 @@ jobs:
           git clone --depth=1 --branch ${{ env.TAG_NAME }} https://github.com/lobehub/lobe-chat.git cloned-lobe-chat
 
       # 5. 修改 Dockerfile（仅在有新 Tag 时）
-      - name: Modify Dockerfile.database in cloned repository
+      - name: Modify Dockerfile in cloned repository
         if: env.updated == 'true'
         run: |
           sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' cloned-lobe-chat/Dockerfile
@@ -104,7 +104,7 @@ jobs:
       - name: Build and push Docker image
         if: env.updated == 'true'
         run: |
-          docker build -f cloned-lobe-chat/Dockerfile.database --cache-from ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest cloned-lobe-chat
+          docker build -f cloned-lobe-chat/Dockerfile --cache-from ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest cloned-lobe-chat
 
           TAG_NAME=${{ env.TAG_NAME }}
           docker tag ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$TAG_NAME
