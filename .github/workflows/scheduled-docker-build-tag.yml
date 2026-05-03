@@ -34,7 +34,12 @@ jobs:
           GH_TOKEN: ${{ secrets.GH_TOKEN }} # 使用自定义的 Secret
         run: |
           # 使用 GitHub API 获取最新的 Tag
-          LATEST_TAG=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/lobehub/lobe-chat/tags | jq -r '.[0].name')
+          API_RESPONSE=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/lobehub/lobe-chat/tags)
+          if ! echo "$API_RESPONSE" | jq -e 'type == "array"' > /dev/null 2>&1; then
+            echo "GitHub API error: $(echo "$API_RESPONSE" | jq -r '.message // "Unknown error"')"
+            exit 1
+          fi
+          LATEST_TAG=$(echo "$API_RESPONSE" | jq -r '.[0].name')
           echo "Latest tag from remote: $LATEST_TAG"
 
           if [ -f "last_tag.txt" ]; then
