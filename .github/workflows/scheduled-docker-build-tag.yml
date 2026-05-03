@@ -30,11 +30,14 @@ jobs:
       # 3. 检查目标仓库的最新 Tag
       - name: Check for new tags in target repository
         id: check_tags
-        env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }} # 使用自定义的 Secret
         run: |
-          # 使用 GitHub API 获取最新的 Tag
-          LATEST_TAG=$(curl -s -H "Authorization: token $GH_TOKEN" https://api.github.com/repos/lobehub/lobe-chat/tags | jq -r '.[0].name')
+          # lobehub/lobe-chat 是公开仓库，无需 Token 即可调用 API
+          API_RESPONSE=$(curl -s https://api.github.com/repos/lobehub/lobe-chat/tags)
+          if ! echo "$API_RESPONSE" | jq -e 'type == "array"' > /dev/null 2>&1; then
+            echo "GitHub API error: $(echo "$API_RESPONSE" | jq -r '.message // "Unknown error"')"
+            exit 1
+          fi
+          LATEST_TAG=$(echo "$API_RESPONSE" | jq -r '.[0].name')
           echo "Latest tag from remote: $LATEST_TAG"
 
           if [ -f "last_tag.txt" ]; then
