@@ -32,7 +32,7 @@ jobs:
         id: check_tags
         run: |
           # lobehub/lobe-chat 是公开仓库，无需 Token 即可调用 API
-          API_RESPONSE=$(curl -s https://api.github.com/repos/lobehub/lobe-chat/tags)
+          API_RESPONSE=$(curl -sL https://api.github.com/repos/lobehub/lobe-chat/tags)
           if ! echo "$API_RESPONSE" | jq -e 'type == "array"' > /dev/null 2>&1; then
             echo "GitHub API error: $(echo "$API_RESPONSE" | jq -r '.message // "Unknown error"')"
             exit 1
