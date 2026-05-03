@@ -65,13 +65,7 @@ jobs:
         run: |
           git clone --depth=1 --branch ${{ env.TAG_NAME }} https://github.com/lobehub/lobe-chat.git cloned-lobe-chat
 
-      # 5. 修改 Dockerfile（仅在有新 Tag 时）
-      - name: Modify Dockerfile in cloned repository
-        if: env.updated == 'true'
-        run: |
-          sed -i '/ENV NODE_OPTIONS=.*max-old-space-size/a ENV NEXT_PUBLIC_ENABLE_NEXT_AUTH=0\nENV NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}\nENV CLERK_WEBHOOK_SECRET=${{ secrets.CLERK_WEBHOOK_SECRET }}' cloned-lobe-chat/Dockerfile
-
-      # 6. 更新 CHANGELOG.md (新增加的步骤)
+      # 5. 更新 CHANGELOG.md (新增加的步骤)
       - name: Update CHANGELOG.md
         if: env.updated == 'true'
         run: |
@@ -79,7 +73,7 @@ jobs:
           CHANGELOG_CONTENT="${NEW_CHANGELOG_BLOCK}$(cat CHANGELOG.md 2>/dev/null)"
           echo "$CHANGELOG_CONTENT" > CHANGELOG.md
 
-      # 7. 提交并推送 CHANGELOG (新增加的步骤)
+      # 6. 提交并推送 CHANGELOG (新增加的步骤)
       - name: Commit and Push CHANGELOG
         if: env.updated == 'true'
         run: |
@@ -94,7 +88,7 @@ jobs:
             echo "CHANGELOG.md was not modified."
           fi
 
-      # 8. 登录 Docker Hub
+      # 7. 登录 Docker Hub
       - name: Login to Docker Hub
         if: env.updated == 'true'
         uses: docker/login-action@v3
@@ -102,7 +96,7 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      # 9. 构建并推送 Docker 镜像
+      # 8. 构建并推送 Docker 镜像
       # 使用克隆的 lobe-chat 仓库作为构建上下文
       - name: Build and push Docker image
         if: env.updated == 'true'
@@ -115,7 +109,7 @@ jobs:
           docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:latest
           docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.DOCKER_REPOSITORY }}:$TAG_NAME
 
-      # 10. 缓存最新的 Tag 版本
+      # 9. 缓存最新的 Tag 版本
       - name: Cache last tag version
         if: env.updated == 'true'
         uses: actions/cache@v4
@@ -123,7 +117,7 @@ jobs:
           path: last_tag.txt
           key: last-tag-${{ github.run_id }} # 确保这次运行的 tag 被保存
 
-      # 11. 清理
+      # 10. 清理
       - name: Clean up
         if: always()
         run: |
